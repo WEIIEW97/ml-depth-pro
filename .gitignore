@@ -1,0 +1,11 @@
+build
+checkpoints
+data
+
+.cache
+onnx_hf
+onnx_exp
+
+*.ipynb
+
+**/__pycache__
