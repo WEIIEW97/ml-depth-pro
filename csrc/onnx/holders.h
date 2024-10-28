@@ -16,13 +16,15 @@
 
 #pragma once
 
-#include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
+#include <onnxruntime_cxx_api.h>
 
-#include <tuple>
-#include <string>
+struct OrtSetupHolders {
+  Ort::Env env;
+  Ort::SessionOptions session_options;
+  OrtCUDAProviderOptions cuda_options;
+  Ort::Session session;
+  Ort::MemoryInfo memory_info;
 
-std::tuple<cv::Mat, int, int> preprocess_image(const std::string& img_path);
-cv::Mat tensor_to_mat(float* data, int batchIndex, int channels, int height,
-                      int width);
-cv::Mat tensor_to_mat_dnn(float* data, int height, int width, int channels);
+  std::vector<const char*> input_node_names = {};
+  std::vector<const char*> output_node_names = {};
+};

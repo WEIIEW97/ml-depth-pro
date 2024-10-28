@@ -17,8 +17,17 @@
 #pragma once
 
 #include <onnxruntime_cxx_api.h>
-#include <vector>
+
+#include <memory>
 
 #include "../utils.h"
+#include "holders.h"
 
-Ort::Value mat_to_tensor(cv::Mat& img, OrtMemoryInfo* memory_info);
+// for starting up the engine, do some warmup, time consuming
+std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
+                                        int cpu_num_thread, bool verbose);
+
+// inference a single image by warmed-up onnx runtime engines
+void infer(std::shared_ptr<OrtSetupHolders>& holders,
+           const std::string& img_path, cv::Mat& inverse_depth_full,
+           float& f_px);

@@ -1,8 +1,11 @@
 build
 checkpoints
 data
+cmake-build-release
+cmake-build-debug
 
 .cache
+.idea
 onnx_hf
 onnx_exp
 

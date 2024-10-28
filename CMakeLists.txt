@@ -7,13 +7,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(Torch_DIR "/home/william/Codes/libtorch/share/cmake/Torch")
-set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.19.2")
+set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.18.0")
+set(MATLAB_ROOT "/usr/local/MATLAB/R2023b")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
 include(CheckIncludeFile)
 include(CheckIncludeFileCXX)
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Matlab REQUIRED MX_LIBRARY ENG_LIBRARY MAT_LIBRARY MAIN_PROGRAM)
+
 # find_package(Torch REQUIRED)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
@@ -26,8 +30,8 @@ file(GLOB_RECURSE headers ${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.h)
 
 
 add_executable(${PROJECT_NAME} 
-    ${onnx_sources}
-    ${shared_sources} 
+#    ${onnx_sources}
+#    ${shared_sources}
     main.cpp
 )
 
@@ -39,7 +43,7 @@ target_include_directories(
     ${onnx_runtime_dir}/include/onnxruntime/core/session/
     ${onnx_runtime_dir}/include/onnxruntime/core/providers/tensorrt/
     ${onnx_runtime_dir}/include
-
+    ${Matlab_INCLUDE_DIRS}
 )
 
 target_link_libraries(
@@ -48,6 +52,8 @@ target_link_libraries(
     # ${TORCH_LIBRARIES} 
     ${OpenCV_LIBS}
     libonnxruntime.so
+    libonnxruntime_providers_cuda.so
+    ${Matlab_LIBRARIES}
 )
 
 check_include_file_cxx(tensorrt_provider_factory.h HAVE_TENSORRT_PROVIDER_FACTORY_H)
@@ -72,3 +78,6 @@ if (MSVC)
                      ${TORCH_DLLS}
                      $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 endif (MSVC)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX .mexa64)
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)

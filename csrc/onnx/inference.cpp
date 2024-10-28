@@ -16,6 +16,9 @@
 
 #include "inference.h"
 
+#include "../macros.h"
+#include <vector>
+
 bool CheckStatus(const OrtApi* g_ort, OrtStatus* status) {
   if (status != nullptr) {
     const char* msg = g_ort->GetErrorMessage(status);
@@ -26,137 +29,102 @@ bool CheckStatus(const OrtApi* g_ort, OrtStatus* status) {
   return true;
 }
 
-Ort::Value mat_to_tensor(cv::Mat& img, OrtMemoryInfo* memory_info) {
-  std::vector<int64_t> input_node_dims = {1, 3, img.rows, img.cols};
-  size_t num_elements = img.total() * img.channels();
-  std::vector<float> array;
-  array.assign(img.begin<float>(), img.end<float>());
+Ort::Value mat_to_tensor(cv::Mat& img, const Ort::MemoryInfo& memory_info) {
+  cv::Mat img_continuous = img;
+  if (!img.isContinuous()) {
+    img_continuous = img.clone();
+  }
+  std::vector<int64_t> input_node_dims = {
+      img_continuous.size[0], img_continuous.size[1], img_continuous.size[2],
+      img_continuous.size[3]};
   return Ort::Value::CreateTensor<float>(
-      memory_info, array.data(), num_elements, input_node_dims.data(), 4);
+      memory_info,
+      reinterpret_cast<float*>(img_continuous.data), // direct pointer to data
+      img_continuous.total() *
+          img_continuous.elemSize1(), // total number of elements, adjusted by
+                                      // element size
+      input_node_dims.data(), input_node_dims.size());
 }
 
-const OrtApi* warmup(const std::string& onnx_path, bool is_fp32 = true) {
-  const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-  OrtEnv* env;
-  CheckStatus(g_ort, g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "test", &env));
+std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
+                                        int cpu_num_thread, bool verbose) {
+  std::shared_ptr<OrtSetupHolders> holder_ptr =
+      std::make_shared<OrtSetupHolders>();
 
-  OrtSessionOptions* session_options;
-  CheckStatus(g_ort, g_ort->CreateSessionOptions(&session_options));
-  CheckStatus(g_ort, g_ort->SetIntraOpNumThreads(session_options, 1));
-  CheckStatus(g_ort, g_ort->SetSessionGraphOptimizationLevel(session_options,
-                                                             ORT_ENABLE_BASIC));
+  holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
+  holder_ptr->cuda_options.device_id = 0;
+  holder_ptr->cuda_options.arena_extend_strategy = 1;
+  holder_ptr->cuda_options.cudnn_conv_algo_search =
+      OrtCudnnConvAlgoSearchDefault;
+  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
 
-  std::vector<const char*> options_keys = {};
-  std::vector<const char*> options_values = {};
+  holder_ptr->session_options.AppendExecutionProvider_CUDA(
+      holder_ptr->cuda_options);
+  holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
+  if (verbose)
+    holder_ptr->session_options.SetLogSeverityLevel(1);
+  holder_ptr->session_options.SetGraphOptimizationLevel(
+      ORT_ENABLE_BASIC); // something needed for GPU allocation
+  holder_ptr->session = Ort::Session(holder_ptr->env, onnx_path.c_str(),
+                                     holder_ptr->session_options);
 
-  // Need to set the HTP FP16 precision for float32 model, otherwise it's FP32
-  // precision and runs very slow No need to set it for float16 model
-  const std::string ENABLE_HTP_FP16_PRECISION = "enable_htp_fp16_precision";
-  const std::string ENABLE_HTP_FP16_PRECISION_VALUE = "1";
-  if (is_fp32) {
-    options_keys.push_back(ENABLE_HTP_FP16_PRECISION.c_str());
-    options_values.push_back(ENABLE_HTP_FP16_PRECISION_VALUE.c_str());
+  auto input_node_allocated = holder_ptr->session.GetInputNameAllocated(
+      0, Ort::AllocatorWithDefaultOptions());
+  holder_ptr->input_node_names = {input_node_allocated.get()};
+
+  std::vector<Ort::AllocatedStringPtr> output_node_allocated;
+  size_t num_outputs = holder_ptr->session.GetOutputCount();
+  for (size_t i = 0; i < num_outputs; ++i) {
+    output_node_allocated.push_back(holder_ptr->session.GetOutputNameAllocated(
+        i, Ort::AllocatorWithDefaultOptions()));
+    holder_ptr->output_node_names.push_back(output_node_allocated.back().get());
   }
 
-  CheckStatus(g_ort, g_ort->SessionOptionsAppendExecutionProvider(
-                         session_options, "depth-pro", options_keys.data(),
-                         options_values.data(), options_keys.size()));
+  if (verbose) {
+    std::cout << "Expected inputs: ";
+    for (const auto& name : holder_ptr->input_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
 
-  OrtSession* session;
-  CheckStatus(g_ort, g_ort->CreateSession(env, onnx_path.c_str(),
-                                          session_options, &session));
-
-  OrtAllocator* allocator;
-  CheckStatus(g_ort, g_ort->GetAllocatorWithDefaultOptions(&allocator));
-  size_t num_input_nodes;
-  CheckStatus(g_ort, g_ort->SessionGetInputCount(session, &num_input_nodes));
-
-  std::vector<const char*> input_node_names;
-  std::vector<std::vector<int64_t>> input_node_dims;
-  std::vector<ONNXTensorElementDataType> input_types;
-  std::vector<OrtValue*> input_tensors;
-
-  input_node_names.resize(num_input_nodes);
-  input_node_dims.resize(num_input_nodes);
-  input_types.resize(num_input_nodes);
-  input_tensors.resize(num_input_nodes);
-
-  for (size_t i = 0; i < num_input_nodes; i++) {
-    // Get input node names
-    char* input_name;
-    CheckStatus(g_ort,
-                g_ort->SessionGetInputName(session, i, allocator, &input_name));
-    input_node_names[i] = input_name;
-
-    // Get input node types
-    OrtTypeInfo* type_info;
-    CheckStatus(g_ort, g_ort->SessionGetInputTypeInfo(session, i, &type_info));
-    const OrtTensorTypeAndShapeInfo* tensor_info;
-    CheckStatus(g_ort,
-                g_ort->CastTypeInfoToTensorInfo(type_info, &tensor_info));
-    ONNXTensorElementDataType type;
-    CheckStatus(g_ort, g_ort->GetTensorElementType(tensor_info, &type));
-    input_types[i] = type;
-
-    // Get input shapes/dims
-    size_t num_dims;
-    CheckStatus(g_ort, g_ort->GetDimensionsCount(tensor_info, &num_dims));
-    input_node_dims[i].resize(num_dims);
-    CheckStatus(g_ort, g_ort->GetDimensions(
-                           tensor_info, input_node_dims[i].data(), num_dims));
-
-    if (type_info)
-      g_ort->ReleaseTypeInfo(type_info);
+    std::cout << "Expected outputs: ";
+    for (const auto& name : holder_ptr->output_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
   }
 
-  size_t num_output_nodes;
-  std::vector<const char*> output_node_names;
-  std::vector<std::vector<int64_t>> output_node_dims;
-  std::vector<OrtValue*> output_tensors;
-  CheckStatus(g_ort, g_ort->SessionGetOutputCount(session, &num_output_nodes));
-  output_node_names.resize(num_output_nodes);
-  output_node_dims.resize(num_output_nodes);
-  output_tensors.resize(num_output_nodes);
+  holder_ptr->memory_info =
+      Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-  for (size_t i = 0; i < num_output_nodes; i++) {
-    // Get output node names
-    char* output_name;
-    CheckStatus(g_ort, g_ort->SessionGetOutputName(session, i, allocator,
-                                                   &output_name));
-    output_node_names[i] = output_name;
-
-    OrtTypeInfo* type_info;
-    CheckStatus(g_ort, g_ort->SessionGetOutputTypeInfo(session, i, &type_info));
-    const OrtTensorTypeAndShapeInfo* tensor_info;
-    CheckStatus(g_ort,
-                g_ort->CastTypeInfoToTensorInfo(type_info, &tensor_info));
-
-    // Get output shapes/dims
-    size_t num_dims;
-    CheckStatus(g_ort, g_ort->GetDimensionsCount(tensor_info, &num_dims));
-    output_node_dims[i].resize(num_dims);
-    CheckStatus(g_ort, g_ort->GetDimensions(
-                           tensor_info, (int64_t*)output_node_dims[i].data(),
-                           num_dims));
-
-    if (type_info)
-      g_ort->ReleaseTypeInfo(type_info);
-  }
-
-  return g_ort;
+  return holder_ptr;
 }
 
-void infer(const std::string& img_path, const OrtApi* g_ort, cv::Mat& out_depth,
-           float pix_f) {
+void infer(std::shared_ptr<OrtSetupHolders>& holders,
+           const std::string& img_path, cv::Mat& inverse_depth_full,
+           float& f_px) {
+  auto [rgb_fp32_t, h, w] = preprocess_image(img_path);
+  std::vector<Ort::Value> input_tensors;
+  auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
+  input_tensors.emplace_back(std::move(rgb_tensor));
 
-  OrtMemoryInfo* memory_info;
-  CheckStatus(g_ort, g_ort->CreateCpuMemoryInfo(
-                         OrtArenaAllocator, OrtMemTypeDefault, &memory_info));
+  auto output_tensors = holders->session.Run(
+      Ort::RunOptions{nullptr}, holders->input_node_names.data(),
+      input_tensors.data(), holders->session.GetInputCount(),
+      holders->output_node_names.data(), holders->session.GetOutputCount());
 
-  auto [rgb, h, w] = preprocess_image(img_path);
-  auto rgb_tensor = mat_to_tensor(rgb, memory_info);
+  float* canonical_inverse_depth_data =
+      output_tensors[0].GetTensorMutableData<float>();
 
-  g_ort->ReleaseMemoryInfo(memory_info);
+  auto canonoical_inverse_depth = tensor_to_mat_dnn(
+      canonical_inverse_depth_data, DEPTH_PRO_FIXED_RESOLUTION,
+      DEPTH_PRO_FIXED_RESOLUTION, DEPTH_PRO_FIXED_OUT_CHANNELS);
+  float fov_deg = *output_tensors[1].GetTensorMutableData<float>();
 
-  
+  if (f_px == 0.0f) {
+    f_px = 0.5 * w / std::tan(0.5 * fov_deg * CV_PI / 180.0);
+  }
+
+  cv::resize(canonoical_inverse_depth, inverse_depth_full, cv::Size(w, h));
 }
