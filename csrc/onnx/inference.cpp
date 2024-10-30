@@ -101,6 +101,118 @@ std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
   return holder_ptr;
 }
 
+std::shared_ptr<OrtSetupHolders> warmup(const char* onnx_path,
+                                        int cpu_num_thread, bool verbose) {
+  std::shared_ptr<OrtSetupHolders> holder_ptr =
+      std::make_shared<OrtSetupHolders>();
+
+  holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
+  holder_ptr->cuda_options.device_id = 0;
+  holder_ptr->cuda_options.arena_extend_strategy = 1;
+  holder_ptr->cuda_options.cudnn_conv_algo_search =
+      OrtCudnnConvAlgoSearchDefault;
+  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
+
+  holder_ptr->session_options.AppendExecutionProvider_CUDA(
+      holder_ptr->cuda_options);
+  holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
+  if (verbose)
+    holder_ptr->session_options.SetLogSeverityLevel(1);
+  holder_ptr->session_options.SetGraphOptimizationLevel(
+      ORT_ENABLE_BASIC); // something needed for GPU allocation
+  holder_ptr->session =
+      Ort::Session(holder_ptr->env, onnx_path, holder_ptr->session_options);
+
+  auto input_node_allocated = holder_ptr->session.GetInputNameAllocated(
+      0, Ort::AllocatorWithDefaultOptions());
+  holder_ptr->input_node_names = {input_node_allocated.get()};
+
+  std::vector<Ort::AllocatedStringPtr> output_node_allocated;
+  size_t num_outputs = holder_ptr->session.GetOutputCount();
+  for (size_t i = 0; i < num_outputs; ++i) {
+    output_node_allocated.push_back(holder_ptr->session.GetOutputNameAllocated(
+        i, Ort::AllocatorWithDefaultOptions()));
+    holder_ptr->output_node_names.push_back(output_node_allocated.back().get());
+  }
+
+  if (verbose) {
+    std::cout << "Expected inputs: ";
+    for (const auto& name : holder_ptr->input_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "Expected outputs: ";
+    for (const auto& name : holder_ptr->output_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  holder_ptr->memory_info =
+      Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+  return holder_ptr;
+}
+
+OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
+                          bool verbose) {
+
+  auto holder_ptr = new OrtSetupHolders;
+
+  holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
+  holder_ptr->cuda_options.device_id = 0;
+  holder_ptr->cuda_options.arena_extend_strategy = 1;
+  holder_ptr->cuda_options.cudnn_conv_algo_search =
+      OrtCudnnConvAlgoSearchDefault;
+  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
+
+  holder_ptr->session_options.AppendExecutionProvider_CUDA(
+      holder_ptr->cuda_options);
+  holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
+  if (verbose)
+    holder_ptr->session_options.SetLogSeverityLevel(1);
+  holder_ptr->session_options.SetGraphOptimizationLevel(
+      ORT_ENABLE_BASIC); // something needed for GPU allocation
+  holder_ptr->session =
+      Ort::Session(holder_ptr->env, onnx_path, holder_ptr->session_options);
+
+  auto input_node_allocated = holder_ptr->session.GetInputNameAllocated(
+      0, Ort::AllocatorWithDefaultOptions());
+  holder_ptr->input_node_names = {input_node_allocated.get()};
+
+  std::vector<Ort::AllocatedStringPtr> output_node_allocated;
+  size_t num_outputs = holder_ptr->session.GetOutputCount();
+  for (size_t i = 0; i < num_outputs; ++i) {
+    output_node_allocated.push_back(holder_ptr->session.GetOutputNameAllocated(
+        i, Ort::AllocatorWithDefaultOptions()));
+    holder_ptr->output_node_names.push_back(output_node_allocated.back().get());
+  }
+
+  if (verbose) {
+    std::cout << "Expected inputs: ";
+    for (const auto& name : holder_ptr->input_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "Expected outputs: ";
+    for (const auto& name : holder_ptr->output_node_names) {
+      std::cout << name << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  holder_ptr->memory_info =
+      Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+  return holder_ptr;
+}
+
+void delete_ptr(OrtSetupHolders* ptr) { delete ptr; }
+
 void infer(std::shared_ptr<OrtSetupHolders>& holders,
            const std::string& img_path, cv::Mat& inverse_depth_full,
            float& f_px) {
@@ -114,7 +226,61 @@ void infer(std::shared_ptr<OrtSetupHolders>& holders,
       input_tensors.data(), holders->session.GetInputCount(),
       holders->output_node_names.data(), holders->session.GetOutputCount());
 
-  float* canonical_inverse_depth_data =
+  auto* canonical_inverse_depth_data =
+      output_tensors[0].GetTensorMutableData<float>();
+
+  auto canonoical_inverse_depth = tensor_to_mat_dnn(
+      canonical_inverse_depth_data, DEPTH_PRO_FIXED_RESOLUTION,
+      DEPTH_PRO_FIXED_RESOLUTION, DEPTH_PRO_FIXED_OUT_CHANNELS);
+  float fov_deg = *output_tensors[1].GetTensorMutableData<float>();
+
+  if (f_px == 0.0f) {
+    f_px = 0.5 * w / std::tan(0.5 * fov_deg * CV_PI / 180.0);
+  }
+
+  cv::resize(canonoical_inverse_depth, inverse_depth_full, cv::Size(w, h));
+}
+
+void infer(std::shared_ptr<OrtSetupHolders>& holders, const char* img_path,
+           cv::Mat& inverse_depth_full, float& f_px) {
+  auto [rgb_fp32_t, h, w] = preprocess_image(std::string(img_path));
+  std::vector<Ort::Value> input_tensors;
+  auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
+  input_tensors.emplace_back(std::move(rgb_tensor));
+
+  auto output_tensors = holders->session.Run(
+      Ort::RunOptions{nullptr}, holders->input_node_names.data(),
+      input_tensors.data(), holders->session.GetInputCount(),
+      holders->output_node_names.data(), holders->session.GetOutputCount());
+
+  auto* canonical_inverse_depth_data =
+      output_tensors[0].GetTensorMutableData<float>();
+
+  auto canonoical_inverse_depth = tensor_to_mat_dnn(
+      canonical_inverse_depth_data, DEPTH_PRO_FIXED_RESOLUTION,
+      DEPTH_PRO_FIXED_RESOLUTION, DEPTH_PRO_FIXED_OUT_CHANNELS);
+  float fov_deg = *output_tensors[1].GetTensorMutableData<float>();
+
+  if (f_px == 0.0f) {
+    f_px = 0.5 * w / std::tan(0.5 * fov_deg * CV_PI / 180.0);
+  }
+
+  cv::resize(canonoical_inverse_depth, inverse_depth_full, cv::Size(w, h));
+}
+
+void c_infer(OrtSetupHolders* holders, const char* img_path,
+             cv::Mat& inverse_depth_full, float& f_px) {
+  auto [rgb_fp32_t, h, w] = preprocess_image(std::string(img_path));
+  std::vector<Ort::Value> input_tensors;
+  auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
+  input_tensors.emplace_back(std::move(rgb_tensor));
+
+  auto output_tensors = holders->session.Run(
+      Ort::RunOptions{nullptr}, holders->input_node_names.data(),
+      input_tensors.data(), holders->session.GetInputCount(),
+      holders->output_node_names.data(), holders->session.GetOutputCount());
+
+  auto* canonical_inverse_depth_data =
       output_tensors[0].GetTensorMutableData<float>();
 
   auto canonoical_inverse_depth = tensor_to_mat_dnn(

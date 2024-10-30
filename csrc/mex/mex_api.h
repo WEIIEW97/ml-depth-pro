@@ -16,16 +16,8 @@
 
 #pragma once
 
+#include <mex.h>
 #include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
 
-#include <tuple>
-#include <string>
-#include <thread>
-
-std::tuple<cv::Mat, int, int> preprocess_image(const std::string& img_path);
-cv::Mat tensor_to_mat(float* data, int batchIndex, int channels, int height,
-                      int width);
-cv::Mat tensor_to_mat_dnn(float* data, int height, int width, int channels);
-int get_maximum_threads_of_cpu();
-int safe_get_maximum_threads_of_cpu();
+mxArray* convert_mat_to_mx_array(const cv::Mat& mat);
+cv::Mat mx_array_to_mat(const mxArray* array);

@@ -107,3 +107,9 @@ cv::Mat tensor_to_mat_dnn(float* data, int height, int width, int channels) {
 
   return output;
 }
+
+int get_maximum_threads_of_cpu() { return std::thread::hardware_concurrency(); }
+
+int safe_get_maximum_threads_of_cpu() {
+  return get_maximum_threads_of_cpu() - SAFE_THREADS_PROTECT_CORES;
+}

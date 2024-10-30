@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
-#pragma once
 
-#include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
+#include "mex_api.h"
 
-#include <tuple>
-#include <string>
-#include <thread>
+#include "../onnx/inference.h"
 
-std::tuple<cv::Mat, int, int> preprocess_image(const std::string& img_path);
-cv::Mat tensor_to_mat(float* data, int batchIndex, int channels, int height,
-                      int width);
-cv::Mat tensor_to_mat_dnn(float* data, int height, int width, int channels);
-int get_maximum_threads_of_cpu();
-int safe_get_maximum_threads_of_cpu();
+
+void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
+    if (nrhs != 3) {
+        mexErrMsgIdAndTxt("MATLAB:warmup:invalidNumInputs", "Three inputs required.");
+    }
+
+    const char* onnx_path = mxArrayToString(prhs[0]);
+    int cpu_num_thread = static_cast<int>(mxGetScalar(prhs[1]));
+    bool verbose = mxGetLogicals(prhs[2])[0];
+
+    auto holders = warmup(onnx_path, cpu_num_thread, verbose);
+
+    
+}

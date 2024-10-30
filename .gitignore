@@ -8,6 +8,7 @@ cmake-build-debug
 .idea
 onnx_hf
 onnx_exp
+trt
 
 *.ipynb
 

@@ -27,4 +27,14 @@ struct OrtSetupHolders {
 
   std::vector<const char*> input_node_names = {};
   std::vector<const char*> output_node_names = {};
+
+  OrtSetupHolders()
+      : env(ORT_LOGGING_LEVEL_WARNING), // assuming ORT_LOGGING_LEVEL_WARNING is
+                                        // a valid argument
+        session_options(),              // default constructible assumed
+        cuda_options(), // need to ensure it's default constructible
+        session(env, "model_path",
+                session_options), // This requires valid model path and env
+        memory_info(
+            Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault)) {}
 };

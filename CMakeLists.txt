@@ -25,13 +25,15 @@ file(GLOB_RECURSE torch_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/libtorch/*.cpp)
 file(GLOB_RECURSE onnx_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/onnx/*.cpp)
 file(GLOB_RECURSE trt_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/tensorrt/*.cpp)
 file(GLOB shared_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.cpp)
+file(GLOB_RECURSE mex_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/mex/*.cpp)
 
 file(GLOB_RECURSE headers ${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.h)
 
 
 add_executable(${PROJECT_NAME} 
-#    ${onnx_sources}
-#    ${shared_sources}
+    ${onnx_sources}
+    ${shared_sources}
+    ${mex_sources}
     main.cpp
 )
 

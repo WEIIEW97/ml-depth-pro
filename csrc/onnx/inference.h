@@ -23,6 +23,20 @@
 #include "../utils.h"
 #include "holders.h"
 
+// for c api compatible
+std::shared_ptr<OrtSetupHolders> warmup(const char* onnx_path,
+                                        int cpu_num_thread, bool verbose);
+OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
+                         bool verbose);
+
+void infer(std::shared_ptr<OrtSetupHolders>& holders, const char* img_path,
+           cv::Mat& inverse_depth_full, float& f_px);
+void c_infer(OrtSetupHolders* holders, const char* img_path,
+           cv::Mat& inverse_depth_full, float& f_px);
+
+void delete_ptr(OrtSetupHolders* ptr);
+/////////////////////////// c++ calls ///////////////////////////
+
 // for starting up the engine, do some warmup, time consuming
 std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
                                         int cpu_num_thread, bool verbose);
