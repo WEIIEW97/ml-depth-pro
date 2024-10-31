@@ -1,14 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(depth-pro)
+project(onnx_infer)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(Torch_DIR "/home/william/Codes/libtorch/share/cmake/Torch")
-set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.18.0")
-set(MATLAB_ROOT "/usr/local/MATLAB/R2023b")
+if (UNIX AND NOT APPLE)
+    # set(Torch_DIR "/home/william/Codes/libtorch/share/cmake/Torch")
+    set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.18.0")
+    # adjust it accordingly
+    set(MATLAB_ROOT "/usr/local/MATLAB/R2023b")
+elseif(WIN32)
+    set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.18.0")
+    # adjust it accordingly
+    set(MATLAB_ROOT "/usr/local/MATLAB/R2023b")
+else()
+    # for apple support
+    set(onnx_runtime_dir "/home/william/Codes/onnxruntime-linux-x64-gpu-1.18.0")
+    set(MATLAB_ROOT "/usr/local/MATLAB/R2023b")
+endif()
+
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
 include(CheckIncludeFile)
@@ -21,7 +33,7 @@ find_package(Matlab REQUIRED MX_LIBRARY ENG_LIBRARY MAT_LIBRARY MAIN_PROGRAM)
 # find_package(Torch REQUIRED)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-file(GLOB_RECURSE torch_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/libtorch/*.cpp)
+# file(GLOB_RECURSE torch_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/libtorch/*.cpp)
 file(GLOB_RECURSE onnx_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/onnx/*.cpp)
 file(GLOB_RECURSE trt_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/tensorrt/*.cpp)
 file(GLOB shared_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.cpp)
@@ -30,11 +42,18 @@ file(GLOB_RECURSE mex_sources ${CMAKE_CURRENT_SOURCE_DIR}/csrc/mex/*.cpp)
 file(GLOB_RECURSE headers ${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.h)
 
 
-add_executable(${PROJECT_NAME} 
+# add_executable(${PROJECT_NAME} 
+#     ${onnx_sources}
+#     ${shared_sources}
+#     ${mex_sources}
+#     main.cpp
+# )
+
+add_library(${PROJECT_NAME} 
+    SHARED
     ${onnx_sources}
     ${shared_sources}
     ${mex_sources}
-    main.cpp
 )
 
 target_include_directories(
@@ -70,16 +89,27 @@ target_link_directories(${PROJECT_NAME}
         ${onnx_runtime_dir}/lib
 )
 
+# if (MSVC)
+#   file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+#   add_custom_command(TARGET ${PROJECT_NAME}
+#                      POST_BUILD
+#                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#                      ${TORCH_DLLS}
+#                      $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+# endif (MSVC)
 
 
-if (MSVC)
-  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
-  add_custom_command(TARGET ${PROJECT_NAME}
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     ${TORCH_DLLS}
-                     $<TARGET_FILE_DIR:${PROJECT_NAME}>)
-endif (MSVC)
+if(WIN32)
+    set(MEX_SUFFIX ".mexw64")
+elseif(UNIX AND NOT APPLE)
+    set(MEX_SUFFIX ".mexa64")
+elseif(APPLE)
+    set(MEX_SUFFIX ".mexmaci64")
+else()
+    message(FATAL_ERROR "Unsupported platform")
+endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX .mexa64)
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ${MEX_SUFFIX})
+set_target_properties(${PROJECT_NAME} PROPERTIES 
+    LINKER_LANGUAGE CXX
+)

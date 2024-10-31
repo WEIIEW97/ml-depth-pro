@@ -47,20 +47,24 @@ Ort::Value mat_to_tensor(cv::Mat& img, const Ort::MemoryInfo& memory_info) {
 }
 
 std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
-                                        int cpu_num_thread, bool verbose) {
+                                        int cpu_num_thread, bool verbose,
+                                        bool use_cuda) {
   std::shared_ptr<OrtSetupHolders> holder_ptr =
       std::make_shared<OrtSetupHolders>();
 
   holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
-  holder_ptr->cuda_options.device_id = 0;
-  holder_ptr->cuda_options.arena_extend_strategy = 1;
-  holder_ptr->cuda_options.cudnn_conv_algo_search =
-      OrtCudnnConvAlgoSearchDefault;
-  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
-  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
 
-  holder_ptr->session_options.AppendExecutionProvider_CUDA(
-      holder_ptr->cuda_options);
+  if (use_cuda) {
+    holder_ptr->cuda_options.device_id = 0;
+    holder_ptr->cuda_options.arena_extend_strategy = 1;
+    holder_ptr->cuda_options.cudnn_conv_algo_search =
+        OrtCudnnConvAlgoSearchDefault;
+    holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+    holder_ptr->cuda_options.do_copy_in_default_stream = 1;
+
+    holder_ptr->session_options.AppendExecutionProvider_CUDA(
+        holder_ptr->cuda_options);
+  }
   holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
   if (verbose)
     holder_ptr->session_options.SetLogSeverityLevel(1);
@@ -101,21 +105,24 @@ std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
   return holder_ptr;
 }
 
-std::shared_ptr<OrtSetupHolders> warmup(const char* onnx_path,
-                                        int cpu_num_thread, bool verbose) {
+std::shared_ptr<OrtSetupHolders>
+warmup(const char* onnx_path, int cpu_num_thread, bool verbose, bool use_cuda) {
   std::shared_ptr<OrtSetupHolders> holder_ptr =
       std::make_shared<OrtSetupHolders>();
 
   holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
-  holder_ptr->cuda_options.device_id = 0;
-  holder_ptr->cuda_options.arena_extend_strategy = 1;
-  holder_ptr->cuda_options.cudnn_conv_algo_search =
-      OrtCudnnConvAlgoSearchDefault;
-  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
-  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
 
-  holder_ptr->session_options.AppendExecutionProvider_CUDA(
-      holder_ptr->cuda_options);
+  if (use_cuda) {
+    holder_ptr->cuda_options.device_id = 0;
+    holder_ptr->cuda_options.arena_extend_strategy = 1;
+    holder_ptr->cuda_options.cudnn_conv_algo_search =
+        OrtCudnnConvAlgoSearchDefault;
+    holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+    holder_ptr->cuda_options.do_copy_in_default_stream = 1;
+
+    holder_ptr->session_options.AppendExecutionProvider_CUDA(
+        holder_ptr->cuda_options);
+  }
   holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
   if (verbose)
     holder_ptr->session_options.SetLogSeverityLevel(1);
@@ -157,20 +164,23 @@ std::shared_ptr<OrtSetupHolders> warmup(const char* onnx_path,
 }
 
 OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
-                          bool verbose) {
+                          bool verbose, bool use_cuda) {
 
   auto holder_ptr = new OrtSetupHolders;
 
   holder_ptr->env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "test");
-  holder_ptr->cuda_options.device_id = 0;
-  holder_ptr->cuda_options.arena_extend_strategy = 1;
-  holder_ptr->cuda_options.cudnn_conv_algo_search =
-      OrtCudnnConvAlgoSearchDefault;
-  holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
-  holder_ptr->cuda_options.do_copy_in_default_stream = 1;
 
-  holder_ptr->session_options.AppendExecutionProvider_CUDA(
-      holder_ptr->cuda_options);
+  if (use_cuda) {
+    holder_ptr->cuda_options.device_id = 0;
+    holder_ptr->cuda_options.arena_extend_strategy = 1;
+    holder_ptr->cuda_options.cudnn_conv_algo_search =
+        OrtCudnnConvAlgoSearchDefault;
+    holder_ptr->cuda_options.gpu_mem_limit = SIZE_MAX;
+    holder_ptr->cuda_options.do_copy_in_default_stream = 1;
+
+    holder_ptr->session_options.AppendExecutionProvider_CUDA(
+        holder_ptr->cuda_options);
+  }
   holder_ptr->session_options.SetIntraOpNumThreads(cpu_num_thread);
   if (verbose)
     holder_ptr->session_options.SetLogSeverityLevel(1);

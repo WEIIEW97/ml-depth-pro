@@ -18,7 +18,6 @@
 
 #include <cuda_runtime_api.h>
 
-
 #define CUDA_CHECK(callstr)                                                    \
   {                                                                            \
     cudaError_t error_code = callstr;                                          \

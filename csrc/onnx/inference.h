@@ -25,9 +25,9 @@
 
 // for c api compatible
 std::shared_ptr<OrtSetupHolders> warmup(const char* onnx_path,
-                                        int cpu_num_thread, bool verbose);
+                                        int cpu_num_thread, bool verbose, bool use_cuda);
 OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
-                         bool verbose);
+                         bool verbose, bool use_cuda);
 
 void infer(std::shared_ptr<OrtSetupHolders>& holders, const char* img_path,
            cv::Mat& inverse_depth_full, float& f_px);
@@ -39,7 +39,7 @@ void delete_ptr(OrtSetupHolders* ptr);
 
 // for starting up the engine, do some warmup, time consuming
 std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
-                                        int cpu_num_thread, bool verbose);
+                                        int cpu_num_thread, bool verbose, bool use_cuda);
 
 // inference a single image by warmed-up onnx runtime engines
 void infer(std::shared_ptr<OrtSetupHolders>& holders,
