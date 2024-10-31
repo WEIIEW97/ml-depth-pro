@@ -18,6 +18,15 @@
 
 #include "../onnx/inference.h"
 
+// for windows compatibility
+void convertUTF8ToWide(const char* utf8, std::wstring& wide) {
+  int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+  wchar_t* buffer = new wchar_t[len];
+  MultiByteToWideChar(CP_UTF8, 0, utf8, -1, buffer, len);
+  wide.assign(buffer);
+  delete[] buffer;
+}
+
 // functions params:
 // 0: onnx path
 // 1: image path
@@ -27,7 +36,7 @@
 // 5: if use cuda
 
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  if (nrhs != 5) {
+  if (nrhs != 6) {
     mexErrMsgIdAndTxt("MATLAB:onnxInfer:invalidNumInputs",
                       "five inputs required.");
   }
@@ -37,20 +46,32 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                       "Two outputs required.");
   }
 
-  const char* onnx_path = mxArrayToString(prhs[0]);
-  const char* img_path = mxArrayToString(prhs[1]);
+  char* onnx_path_utf8 = mxArrayToString(prhs[0]);
+  char* img_path_utf8 = mxArrayToString(prhs[1]);
   int cpu_num_thread = static_cast<int>(mxGetScalar(prhs[2]));
   float f_px = static_cast<float>(mxGetScalar(prhs[3]));
   bool verbose = mxGetLogicals(prhs[4])[0];
   bool use_cuda = mxGetLogicals(prhs[5])[0];
 
-  auto holders = warmup(onnx_path, cpu_num_thread, verbose, use_cuda);
+#ifdef _WIN32
+  // Convert UTF-8 to Wide String if necessary
+  std::wstring onnx_path_wide, img_path_wide;
+  convertUTF8ToWide(onnx_path_utf8, onnx_path_wide);
+  convertUTF8ToWide(img_path_utf8, img_path_wide);
+
+  auto holders = warmup(onnx_path_wide, cpu_num_thread, verbose, use_cuda);
 
   cv::Mat inverse_depth_full;
-  infer(holders, std::string(img_path), inverse_depth_full, f_px);
+  infer(holders, img_path_wide, inverse_depth_full, f_px);
+#else
+  auto holders = warmup(onnx_path_utf8, cpu_num_thread, verbose, use_cuda);
 
-  mxFree((void*)onnx_path);
-  mxFree((void*)img_path);
+  cv::Mat inverse_depth_full;
+  infer(holders, img_path_utf8, inverse_depth_full, f_px);
+#endif
+
+  mxFree(onnx_path_utf8);
+  mxFree(img_path_utf8);
 
   plhs[0] = convert_mat_to_mx_array(inverse_depth_full);
 

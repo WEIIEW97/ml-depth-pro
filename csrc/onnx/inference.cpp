@@ -46,9 +46,16 @@ Ort::Value mat_to_tensor(cv::Mat& img, const Ort::MemoryInfo& memory_info) {
       input_node_dims.data(), input_node_dims.size());
 }
 
+#ifdef _WIN32
+std::shared_ptr<OrtSetupHolders> warmup(const std::wstring& onnx_path,
+                                        int cpu_num_thread, bool verbose,
+                                        bool use_cuda)
+#else
 std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
                                         int cpu_num_thread, bool verbose,
-                                        bool use_cuda) {
+                                        bool use_cuda)
+#endif
+{
   std::shared_ptr<OrtSetupHolders> holder_ptr =
       std::make_shared<OrtSetupHolders>();
 
@@ -105,8 +112,15 @@ std::shared_ptr<OrtSetupHolders> warmup(const std::string& onnx_path,
   return holder_ptr;
 }
 
+#ifdef _WIN32
+std::shared_ptr<OrtSetupHolders> warmup(const wchar_t* onnx_path,
+                                        int cpu_num_thread, bool verbose,
+                                        bool use_cuda)
+#else
 std::shared_ptr<OrtSetupHolders>
-warmup(const char* onnx_path, int cpu_num_thread, bool verbose, bool use_cuda) {
+warmup(const char* onnx_path, int cpu_num_thread, bool verbose, bool use_cuda)
+#endif
+{
   std::shared_ptr<OrtSetupHolders> holder_ptr =
       std::make_shared<OrtSetupHolders>();
 
@@ -163,8 +177,14 @@ warmup(const char* onnx_path, int cpu_num_thread, bool verbose, bool use_cuda) {
   return holder_ptr;
 }
 
+#ifdef _WIN32
+OrtSetupHolders* c_warmup(const wchar_t* onnx_path, int cpu_num_thread,
+                          bool verbose, bool use_cuda)
+#else
 OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
-                          bool verbose, bool use_cuda) {
+                          bool verbose, bool use_cuda)
+#endif
+{
 
   auto holder_ptr = new OrtSetupHolders;
 
@@ -223,10 +243,21 @@ OrtSetupHolders* c_warmup(const char* onnx_path, int cpu_num_thread,
 
 void delete_ptr(OrtSetupHolders* ptr) { delete ptr; }
 
+#ifdef _WIN32
+void infer(std::shared_ptr<OrtSetupHolders>& holders,
+           const std::wstring& img_path, cv::Mat& inverse_depth_full,
+           float& f_px)
+#else
 void infer(std::shared_ptr<OrtSetupHolders>& holders,
            const std::string& img_path, cv::Mat& inverse_depth_full,
-           float& f_px) {
+           float& f_px)
+#endif
+{
+  #ifdef _WIN32
+  auto [rgb_fp32_t, h, w] = preprocess_image(wideToString(img_path));
+  #else
   auto [rgb_fp32_t, h, w] = preprocess_image(img_path);
+  #endif
   std::vector<Ort::Value> input_tensors;
   auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
   input_tensors.emplace_back(std::move(rgb_tensor));
@@ -251,9 +282,19 @@ void infer(std::shared_ptr<OrtSetupHolders>& holders,
   cv::resize(canonoical_inverse_depth, inverse_depth_full, cv::Size(w, h));
 }
 
+#ifdef _WIN32
+void infer(std::shared_ptr<OrtSetupHolders>& holders, const wchar_t* img_path,
+           cv::Mat& inverse_depth_full, float& f_px)
+#else
 void infer(std::shared_ptr<OrtSetupHolders>& holders, const char* img_path,
-           cv::Mat& inverse_depth_full, float& f_px) {
-  auto [rgb_fp32_t, h, w] = preprocess_image(std::string(img_path));
+           cv::Mat& inverse_depth_full, float& f_px)
+#endif
+{
+  #ifdef _WIN32
+  auto [rgb_fp32_t, h, w] = preprocess_image(wideToString(img_path));
+  #else
+  auto [rgb_fp32_t, h, w] = preprocess_image(img_path);
+  #endif
   std::vector<Ort::Value> input_tensors;
   auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
   input_tensors.emplace_back(std::move(rgb_tensor));
@@ -278,9 +319,19 @@ void infer(std::shared_ptr<OrtSetupHolders>& holders, const char* img_path,
   cv::resize(canonoical_inverse_depth, inverse_depth_full, cv::Size(w, h));
 }
 
+#ifdef _WIN32
+void c_infer(OrtSetupHolders* holders, const wchar_t* img_path,
+             cv::Mat& inverse_depth_full, float& f_px)
+#else
 void c_infer(OrtSetupHolders* holders, const char* img_path,
-             cv::Mat& inverse_depth_full, float& f_px) {
-  auto [rgb_fp32_t, h, w] = preprocess_image(std::string(img_path));
+             cv::Mat& inverse_depth_full, float& f_px)
+#endif
+{
+  #ifdef _WIN32
+  auto [rgb_fp32_t, h, w] = preprocess_image(wideToString(img_path));
+  #else
+  auto [rgb_fp32_t, h, w] = preprocess_image(img_path);
+  #endif
   std::vector<Ort::Value> input_tensors;
   auto rgb_tensor = mat_to_tensor(rgb_fp32_t, holders->memory_info);
   input_tensors.emplace_back(std::move(rgb_tensor));

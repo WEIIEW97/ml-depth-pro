@@ -16,16 +16,17 @@
 
 #pragma once
 
+#include "macros.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 
 #include <tuple>
 #include <string>
-#include <thread>
 
 std::tuple<cv::Mat, int, int> preprocess_image(const std::string& img_path);
 cv::Mat tensor_to_mat(float* data, int batchIndex, int channels, int height,
                       int width);
 cv::Mat tensor_to_mat_dnn(float* data, int height, int width, int channels);
+std::string wideToString(const std::wstring& wstr);
 int get_maximum_threads_of_cpu();
 int safe_get_maximum_threads_of_cpu();

@@ -15,7 +15,14 @@
  */
 
 #include "utils.h"
-#include "macros.h"
+
+
+#include <tuple>
+#include <string>
+#include <type_traits>
+#include <codecvt>
+#include <locale>
+#include <thread>
 
 // meet the same transform protocol with pytorch code
 cv::Mat transform(cv::Mat& img, bool use_dnn_blob = false) {
@@ -44,13 +51,20 @@ cv::Mat transform(cv::Mat& img, bool use_dnn_blob = false) {
   }
 }
 
+// Utility to convert wide strings to narrow strings
+std::string wideToString(const std::wstring& wstr) {
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+  return converter.to_bytes(wstr);
+}
+
 std::tuple<cv::Mat, int, int> preprocess_image(const std::string& img_path) {
   cv::Mat img = cv::imread(img_path, cv::IMREAD_ANYCOLOR);
   cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
   int h = img.rows, w = img.cols;
 
   cv::resize(img, img,
-             cv::Size(DEPTH_PRO_FIXED_RESOLUTION, DEPTH_PRO_FIXED_RESOLUTION));
+             cv::Size(DEPTH_PRO_FIXED_RESOLUTION,
+             DEPTH_PRO_FIXED_RESOLUTION));
 
   cv::Mat img_fp32(img.rows, img.cols, CV_32F);
 

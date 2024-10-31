@@ -1,4 +1,5 @@
 build
+out
 checkpoints
 data
 cmake-build-release
@@ -6,9 +7,14 @@ cmake-build-debug
 
 .cache
 .idea
+.vs
 onnx_hf
 onnx_exp
 trt
+
+matlab/*.mexw64
+matlab/*.dll
+matlab/*.asv
 
 *.ipynb
 

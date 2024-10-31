@@ -34,7 +34,6 @@ def export_depth_pro_onnx(image_path, onnx_path):
         output_names=["canonical_inverse_depth", "fov_deg"],
         verbose=False,
         do_constant_folding=True,
-        use_external_data_format=False  # Change based on actual model size
     )
 
     # Optionally use shape inference if needed
@@ -48,7 +47,10 @@ def export_depth_pro_onnx(image_path, onnx_path):
 
 
 if __name__ == "__main__":
-    image_path = "/home/william/Codes/ml-depth-pro/data/example.jpg"
-    onnx_path = "/home/william/Codes/ml-depth-pro/onnx_exp/depth_pro.onnx"
+    # image_path = "/home/william/Codes/ml-depth-pro/data/example.jpg"
+    # onnx_path = "/home/william/Codes/ml-depth-pro/onnx_exp/depth_pro.onnx"
+
+    image_path = r"D:\william\codes\ml-depth-pro\data\example.jpg"
+    onnx_path = r"D:\william\codes\ml-depth-pro\onnx_exp\depth_pro.onnx"
 
     export_depth_pro_onnx(image_path, onnx_path)
