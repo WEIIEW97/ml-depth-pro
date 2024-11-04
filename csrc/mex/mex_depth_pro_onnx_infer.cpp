@@ -16,7 +16,7 @@
 
 #include "mex_api.h"
 
-#include "../onnx/inference.h"
+#include "inference.h"
 
 // for windows compatibility
 void convertUTF8ToWide(const char* utf8, std::wstring& wide) {

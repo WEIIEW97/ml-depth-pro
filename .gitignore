@@ -2,6 +2,7 @@ build
 out
 checkpoints
 data
+bin
 cmake-build-release
 cmake-build-debug
 
@@ -19,3 +20,11 @@ matlab/*.asv
 *.ipynb
 
 **/__pycache__
+
+# for windows
+**/*.mexw64
+**/*.lib
+**/*.dll
+**/*.pdb
+**/*.asv
+**/*.exp
