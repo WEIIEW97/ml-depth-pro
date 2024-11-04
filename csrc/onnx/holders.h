@@ -25,16 +25,17 @@
 
 // bad implementation, would cause potential memory leak if without deallocation
 inline wchar_t* charToWChar(const char* text) {
-    if (text == nullptr) return nullptr;
+  if (text == nullptr)
+    return nullptr;
 
-    // Get the length needed for the wide string
-    int count = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
-    wchar_t* wText = new wchar_t[count];
+  // Get the length needed for the wide string
+  int count = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
+  wchar_t* wText = new wchar_t[count];
 
-    // Convert the string from multi-byte to wide character
-    MultiByteToWideChar(CP_UTF8, 0, text, -1, wText, count);
+  // Convert the string from multi-byte to wide character
+  MultiByteToWideChar(CP_UTF8, 0, text, -1, wText, count);
 
-    return wText;
+  return wText;
 }
 #endif
 
@@ -54,6 +55,7 @@ struct OrtSetupHolders {
   std::vector<const char*> output_node_names = {};
 #endif
 
+#ifdef _WIN32
   OrtSetupHolders()
       : env(ORT_LOGGING_LEVEL_WARNING), // assuming ORT_LOGGING_LEVEL_WARNING is
                                         // a valid argument
@@ -63,4 +65,16 @@ struct OrtSetupHolders {
                 session_options), // This requires valid model path and env
         memory_info(
             Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault)) {}
+
+#else
+  OrtSetupHolders()
+      : env(ORT_LOGGING_LEVEL_WARNING), // assuming ORT_LOGGING_LEVEL_WARNING is
+                                        // a valid argument
+        session_options(),              // default constructible assumed
+        cuda_options(), // need to ensure it's default constructible
+        session(env, std::string().c_str(),
+                session_options), // This requires valid model path and env
+        memory_info(
+            Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault)) {}
+#endif
 };
