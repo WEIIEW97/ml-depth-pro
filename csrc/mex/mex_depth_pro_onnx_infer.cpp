@@ -19,6 +19,7 @@
 #include "inference.h"
 
 // for windows compatibility
+#ifdef _WIN32
 void convertUTF8ToWide(const char* utf8, std::wstring& wide) {
   int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
   wchar_t* buffer = new wchar_t[len];
@@ -26,6 +27,7 @@ void convertUTF8ToWide(const char* utf8, std::wstring& wide) {
   wide.assign(buffer);
   delete[] buffer;
 }
+#endif
 
 // functions params:
 // 0: onnx path

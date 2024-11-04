@@ -28,3 +28,7 @@ matlab/*.asv
 **/*.pdb
 **/*.asv
 **/*.exp
+
+# for linux
+**/*.mexa64
+**/*.so*
